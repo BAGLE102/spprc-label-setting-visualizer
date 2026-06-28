@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPPRC / SPPTW Label-setting Visualizer</title>
+  <style>
+    body {
+      font-family: "Times New Roman", "Microsoft JhengHei", serif;
+      margin: 0;
+      background: #f7f7f7;
+      color: #111;
+    }
+    .page {
+      max-width: 1200px;
+      margin: 24px auto;
+      background: white;
+      padding: 28px 36px 40px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    h1 {
+      text-align: center;
+      font-size: 30px;
+      margin: 8px 0 6px;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 15px;
+      color: #555;
+      margin-bottom: 24px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 58% 42%;
+      gap: 24px;
+      align-items: start;
+    }
+    svg {
+      width: 100%;
+      border: 1px solid #ddd;
+      background: #fff;
+    }
+    .panel {
+      border: 1px solid #ddd;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      background: #fcfcfc;
+    }
+    .panel h2 {
+      font-size: 20px;
+      margin: 0 0 10px;
+    }
+    button {
+      font-family: inherit;
+      font-size: 16px;
+      padding: 8px 14px;
+      margin-right: 8px;
+      border: 1px solid #333;
+      background: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #eee;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 5px 7px;
+      text-align: center;
+    }
+    th {
+      background: #eee;
+    }
+    .log {
+      height: 150px;
+      overflow-y: auto;
+      background: #111;
+      color: #eee;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      padding: 10px;
+      white-space: pre-wrap;
+    }
+    .legend {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 14px;
+      font-size: 14px;
+      margin-top: 8px;
+    }
+    .dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+    .note {
+      line-height: 1.55;
+      font-size: 15px;
+    }
+    .formula {
+      font-family: Consolas, monospace;
+      background: #f1f1f1;
+      padding: 8px 10px;
+      margin: 8px 0;
+      border-left: 4px solid #333;
+      font-size: 14px;
+    }
+    .small {
+      font-size: 13px;
+      color: #555;
+    }
+    @media (max-width: 900px) {
+      .page { margin: 0; padding: 18px; }
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1>SPPRC / SPPTW Label-setting Algorithm Visualizer</h1>
+  <div class="subtitle">
+    一個用來理解 label、resource extension、feasibility、dominance 的小型互動範例
+  </div>
+
+  <div class="layout">
+    <div>
+      <svg id="graph" viewBox="0 0 700 430"></svg>
+
+      <div class="panel">
+        <h2>操作</h2>
+        <button onclick="nextStep()">Next Step</button>
+        <button onclick="resetAll()">Reset</button>
+        <button onclick="runAll()">Run All</button>
+        <div class="legend">
+          <div><span class="dot" style="background:#4aa3a8"></span>current node / source</div>
+          <div><span class="dot" style="background:#6abf69"></span>target</div>
+          <div><span class="dot" style="background:#e58f45"></span>extension under test</div>
+          <div><span class="dot" style="background:#c84d4d"></span>infeasible / dominated</div>
+        </div>
+      </div>
+
+      <div class="panel note">
+        <h2>這個範例在看什麼？</h2>
+        <p>
+          這是一個簡化的 <b>SPPTW</b>，也就是 SPPRC 的特例。
+          每條邊有 <b>(time, cost)</b>，每個節點有 <b>time window [a, b]</b>。
+          演算法會保存多個 labels，因為同一節點可能同時存在「較早但較貴」和「較晚但較便宜」的 partial path。
+        </p>
+        <div class="formula">
+          time' = max(a_j, time + edge_time)<br>
+          cost' = cost + edge_cost<br>
+          feasible iff time' ≤ b_j
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>Step 說明</h2>
+        <div id="explain" class="note">按下 Next Step 開始。</div>
+      </div>
+
+      <div class="panel">
+        <h2>Unprocessed Labels, U</h2>
+        <table id="uTable">
+          <thead>
+            <tr><th>ID</th><th>Node</th><th>Time</th><th>Cost</th><th>Path</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>Processed Labels, P</h2>
+        <table id="pTable">
+          <thead>
+            <tr><th>ID</th><th>Node</th><th>Time</th><th>Cost</th><th>Path</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>Log</h2>
+        <div id="log" class="log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const nodes = {
+  s: {x: 80,  y: 215, window: [0, 0]},
+  A: {x: 260, y: 90,  window: [2, 8]},
+  B: {x: 260, y: 335, window: [4, 12]},
+  C: {x: 470, y: 215, window: [8, 18]},
+  t: {x: 630, y: 215, window: [0, 30]},
+};
+
+const edges = [
+  {from: "s", to: "A", time: 2, cost: 6},
+  {from: "s", to: "B", time: 4, cost: 2},
+  {from: "A", to: "C", time: 5, cost: 1},
+  {from: "B", to: "C", time: 3, cost: 7},
+  {from: "A", to: "t", time: 9, cost: 8},
+  {from: "C", to: "t", time: 4, cost: 2},
+  {from: "B", to: "t", time: 11, cost: 5},
+];
+
+let U, P, nextId, currentLabel, outgoingIndex, phase, finished;
+let highlight = {};
+
+function resetAll() {
+  U = [{id: "L0", node: "s", time: 0, cost: 0, path: ["s"], pred: null}];
+  P = [];
+  nextId = 1;
+  currentLabel = null;
+  outgoingIndex = 0;
+  phase = "pick";
+  finished = false;
+  highlight = {};
+  setExplain("初始化：U 只有 source label L0=(node=s, time=0, cost=0)。");
+  setLog("Initialize U = {L0@s}, P = ∅\n");
+  render();
+}
+
+function setExplain(html) {
+  document.getElementById("explain").innerHTML = html;
+}
+
+function setLog(text, append=false) {
+  const el = document.getElementById("log");
+  if (append) el.textContent += text;
+  else el.textContent = text;
+  el.scrollTop = el.scrollHeight;
+}
+
+function log(text) {
+  setLog(text + "\n", true);
+}
+
+function labelText(l) {
+  return `${l.id}@${l.node} (T=${l.time}, C=${l.cost})`;
+}
+
+function outgoing(node) {
+  return edges.filter(e => e.from === node);
+}
+
+function dominates(a, b) {
+  return a.node === b.node &&
+         a.time <= b.time &&
+         a.cost <= b.cost &&
+         (a.time < b.time || a.cost < b.cost);
+}
+
+function dominancePrune(newLabel) {
+  let removed = [];
+  U = U.filter(l => {
+    if (dominates(newLabel, l)) {
+      removed.push(l);
+      return false;
+    }
+    return true;
+  });
+  P = P.filter(l => {
+    if (dominates(newLabel, l)) {
+      removed.push(l);
+      return false;
+    }
+    return true;
+  });
+  return removed;
+}
+
+function isDominatedByExisting(label) {
+  return U.concat(P).find(l => dominates(l, label));
+}
+
+function nextStep() {
+  if (finished) {
+    setExplain("演算法已結束。按 Reset 可重新開始。");
+    return;
+  }
+
+  highlight = {};
+
+  if (phase === "pick") {
+    if (U.length === 0) {
+      finishAlgorithm();
+      return;
+    }
+    U.sort((a, b) => (a.time - b.time) || (a.cost - b.cost));
+    currentLabel = U.shift();
+    outgoingIndex = 0;
+    phase = "extend";
+    highlight.currentNode = currentLabel.node;
+    setExplain(`
+      <b>Pick label：</b>從 U 取出 lexicographic 最小的 label：<br>
+      <b>${labelText(currentLabel)}</b><br><br>
+      接著會沿著 ${currentLabel.node} 的 outgoing edges 嘗試 extension。
+    `);
+    log(`Pick ${labelText(currentLabel)} from U.`);
+    render();
+    return;
+  }
+
+  if (phase === "extend") {
+    const outs = outgoing(currentLabel.node);
+    if (outgoingIndex >= outs.length) {
+      P.push(currentLabel);
+      log(`Move ${currentLabel.id} to P.`);
+      setExplain(`
+        <b>Finish current label：</b>${currentLabel.id} 的所有 outgoing edges 都處理完。<br>
+        將 ${currentLabel.id} 放入 processed set P。
+      `);
+      currentLabel = null;
+      phase = "pick";
+      render();
+      return;
+    }
+
+    const e = outs[outgoingIndex++];
+    const target = nodes[e.to];
+    const rawArrival = currentLabel.time + e.time;
+    const newTime = Math.max(target.window[0], rawArrival);
+    const newCost = currentLabel.cost + e.cost;
+    const newLabel = {
+      id: "L" + nextId++,
+      node: e.to,
+      time: newTime,
+      cost: newCost,
+      path: currentLabel.path.concat([e.to]),
+      pred: currentLabel.id
+    };
+
+    highlight.currentNode = currentLabel.node;
+    highlight.edge = e;
+    highlight.extensionNode = e.to;
+
+    const formula = `
+      raw arrival = ${currentLabel.time} + ${e.time} = ${rawArrival}<br>
+      time' = max(${target.window[0]}, ${rawArrival}) = ${newTime}<br>
+      cost' = ${currentLabel.cost} + ${e.cost} = ${newCost}
+    `;
+
+    if (newTime > target.window[1]) {
+      highlight.badNode = e.to;
+      log(`Try ${currentLabel.id} via ${e.from}->${e.to}: infeasible, time ${newTime} > ${target.window[1]}.`);
+      setExplain(`
+        <b>Extend through edge ${e.from} → ${e.to}</b><br>
+        Edge resource = (${e.time}, ${e.cost})<br>
+        ${formula}<br><br>
+        <b style="color:#c84d4d">Infeasible：</b>
+        time'=${newTime} 超過 node ${e.to} 的 upper time window ${target.window[1]}，所以丟掉。
+      `);
+      render();
+      return;
+    }
+
+    const dominator = isDominatedByExisting(newLabel);
+    if (dominator) {
+      highlight.badNode = e.to;
+      log(`Try ${newLabel.id}@${e.to}: dominated by ${dominator.id}, discard.`);
+      setExplain(`
+        <b>Extend through edge ${e.from} → ${e.to}</b><br>
+        ${formula}<br><br>
+        產生 ${labelText(newLabel)}，但它被
+        <b>${labelText(dominator)}</b> dominate。<br>
+        <b style="color:#c84d4d">Dominated label 直接刪除。</b>
+      `);
+      render();
+      return;
+    }
+
+    const removed = dominancePrune(newLabel);
+    U.push(newLabel);
+    highlight.goodNode = e.to;
+    log(`Create ${labelText(newLabel)} via ${e.from}->${e.to}.`);
+    if (removed.length > 0) {
+      log(`  ${newLabel.id} dominates and removes: ${removed.map(x => x.id).join(", ")}`);
+    }
+
+    setExplain(`
+      <b>Extend through edge ${e.from} → ${e.to}</b><br>
+      Edge resource = (${e.time}, ${e.cost})<br>
+      ${formula}<br><br>
+      <b style="color:#2e8b57">Feasible：</b>
+      ${labelText(newLabel)} 加入 U。<br>
+      ${removed.length ? `同時移除被它 dominate 的 label：${removed.map(x => x.id).join(", ")}` : `沒有 label 被它 dominate。`}
+    `);
+    render();
+  }
+}
+
+function finishAlgorithm() {
+  finished = true;
+  const targetLabels = P.filter(l => l.node === "t");
+  if (targetLabels.length === 0) {
+    setExplain("<b>Finish：</b>U 已空，但沒有找到可行的 target label。");
+    log("Finish: no feasible path to target.");
+  } else {
+    targetLabels.sort((a, b) => (a.cost - b.cost) || (a.time - b.time));
+    const best = targetLabels[0];
+    highlight.bestPath = best.path;
+    setExplain(`
+      <b>Finish：</b>U 已空。<br>
+      在 P 中所有 resident at target t 的 labels 裡，選 cost 最小者：<br>
+      <b>${labelText(best)}</b><br>
+      Path = <b>${best.path.join(" → ")}</b>
+    `);
+    log(`Finish: best target label is ${labelText(best)}, path=${best.path.join("->")}.`);
+  }
+  render();
+}
+
+function runAll() {
+  let guard = 0;
+  while (!finished && guard < 200) {
+    nextStep();
+    guard++;
+  }
+}
+
+function renderTables() {
+  const render = (id, data) => {
+    const tbody = document.querySelector(`#${id} tbody`);
+    tbody.innerHTML = "";
+    data.forEach(l => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${l.id}</td>
+        <td>${l.node}</td>
+        <td>${l.time}</td>
+        <td>${l.cost}</td>
+        <td>${l.path.join("→")}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  };
+  render("uTable", U);
+  render("pTable", P);
+}
+
+function render() {
+  renderGraph();
+  renderTables();
+}
+
+function renderGraph() {
+  const svg = document.getElementById("graph");
+  svg.innerHTML = `
+    <defs>
+      <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L10,3 z" fill="#333" />
+      </marker>
+      <marker id="arrowGreen" markerWidth="12" markerHeight="12" refX="10" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L10,3 z" fill="#2e8b57" />
+      </marker>
+    </defs>
+  `;
+
+  const bestEdges = new Set();
+  if (highlight.bestPath) {
+    for (let i = 0; i < highlight.bestPath.length - 1; i++) {
+      bestEdges.add(highlight.bestPath[i] + "->" + highlight.bestPath[i+1]);
+    }
+  }
+
+  edges.forEach(e => {
+    const a = nodes[e.from], b = nodes[e.to];
+    const key = e.from + "->" + e.to;
+    let color = "#333", width = 2.2, marker = "url(#arrow)";
+    if (highlight.edge === e) {
+      color = "#e58f45";
+      width = 4;
+    }
+    if (bestEdges.has(key)) {
+      color = "#2e8b57";
+      width = 5;
+      marker = "url(#arrowGreen)";
+    }
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", a.x);
+    line.setAttribute("y1", a.y);
+    line.setAttribute("x2", b.x);
+    line.setAttribute("y2", b.y);
+    line.setAttribute("stroke", color);
+    line.setAttribute("stroke-width", width);
+    line.setAttribute("marker-end", marker);
+    svg.appendChild(line);
+
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    addSvgText(svg, mx, my - 8, `(${e.time},${e.cost})`, 14, "#111", "middle");
+  });
+
+  Object.entries(nodes).forEach(([name, n]) => {
+    let fill = "#9ed0ef";
+    let stroke = "#146aa1";
+    if (name === "s") fill = "#4aa3a8";
+    if (name === "t") fill = "#6abf69";
+    if (highlight.currentNode === name) {
+      fill = "#4aa3a8";
+      stroke = "#064f53";
+    }
+    if (highlight.extensionNode === name) fill = "#e58f45";
+    if (highlight.goodNode === name) fill = "#6abf69";
+    if (highlight.badNode === name) fill = "#c84d4d";
+
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", n.x);
+    circle.setAttribute("cy", n.y);
+    circle.setAttribute("r", 28);
+    circle.setAttribute("fill", fill);
+    circle.setAttribute("stroke", stroke);
+    circle.setAttribute("stroke-width", 3);
+    svg.appendChild(circle);
+
+    addSvgText(svg, n.x, n.y + 6, name, 19, "#111", "middle", "bold");
+    addSvgText(svg, n.x, n.y - 42, `[${n.window[0]},${n.window[1]}]`, 14, "#333", "middle");
+
+    const labelsHere = U.concat(P).filter(l => l.node === name);
+    labelsHere.forEach((l, idx) => {
+      const y = n.y + 48 + idx * 18;
+      const color = U.includes(l) ? "#e58f45" : "#2e8b57";
+      addSvgText(svg, n.x, y, `${l.id}:(${l.time},${l.cost})`, 12, color, "middle");
+    });
+  });
+}
+
+function addSvgText(svg, x, y, text, size, fill, anchor="start", weight="normal") {
+  const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  t.setAttribute("x", x);
+  t.setAttribute("y", y);
+  t.setAttribute("font-size", size);
+  t.setAttribute("font-family", "Times New Roman, Microsoft JhengHei");
+  t.setAttribute("font-weight", weight);
+  t.setAttribute("fill", fill);
+  t.setAttribute("text-anchor", anchor);
+  t.textContent = text;
+  svg.appendChild(t);
+}
+
+resetAll();
+</script>
+</body>
+</html>
