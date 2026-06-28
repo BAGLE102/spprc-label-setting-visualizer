@@ -14,7 +14,7 @@ However, in SPPRC, a path is evaluated not only by cost, but also by one or more
 Because of these additional constraints, a node may need to keep multiple partial paths, called **labels**.  
 For example, one path may arrive earlier but cost more, while another path may arrive later but cost less. Both can still be useful until the algorithm proves that one is dominated by another.
 
-This visualizer demonstrates this idea step by step.
+This visualizer demonstrates this idea step by step. It also provides a small graph editor, so users can change the source node, target node, node count, time windows, and edge resources directly in the browser.
 
 ## What This Visualizer Shows
 
@@ -34,6 +34,17 @@ The algorithm maintains two label sets:
 - `P`: processed labels
 
 At each step, the algorithm selects a label from `U`, extends it through outgoing edges, checks feasibility, applies dominance rules, and updates the label sets.
+
+The graph editor supports:
+
+- selecting a different source node
+- selecting a different target node
+- rebuilding the graph with a different number of nodes
+- adding or removing intermediate nodes
+- automatically generating directed edges
+- manually editing node time windows
+- manually editing edge time and cost
+- adding or removing edges
 
 ## Core Concepts
 
@@ -126,16 +137,20 @@ Open the website and use the control buttons:
 
 The graph highlights the current label extension, infeasible labels, dominated labels, and the final selected feasible path.
 
-## Customizing the Example
+## Editing the Graph
 
-The graph data is defined directly in `index.html`.
+The graph can be modified directly on the webpage.
 
-To modify the example, edit:
+Common operations:
 
-```javascript
-const nodes = { ... }
-const edges = [ ... ]
-```
+- choose a different `Source` and `Target`
+- change `Node count` and rebuild the graph
+- edit each node's time window `[a, b]`
+- edit each edge's `time` and `cost`
+- add or remove edges
+- press `Apply & Reset` to restart the algorithm using the updated graph
+
+The internal graph data is still stored in `index.html`, so the page can run as a simple static website without any backend.
 
 Each node has a time window:
 
