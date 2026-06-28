@@ -12,7 +12,7 @@
       color: #111;
     }
     .page {
-      max-width: 1200px;
+      max-width: 1280px;
       margin: 24px auto;
       background: white;
       padding: 28px 36px 40px;
@@ -50,17 +50,39 @@
       font-size: 20px;
       margin: 0 0 10px;
     }
-    button {
-      font-family: inherit;
+    .panel h3 {
       font-size: 16px;
-      padding: 8px 14px;
-      margin-right: 8px;
+      margin: 12px 0 6px;
+    }
+    button, select, input {
+      font-family: inherit;
+      font-size: 15px;
+    }
+    button {
+      padding: 7px 12px;
+      margin: 3px 4px 3px 0;
       border: 1px solid #333;
       background: white;
       cursor: pointer;
     }
     button:hover {
       background: #eee;
+    }
+    button.primary {
+      background: #111;
+      color: white;
+    }
+    button.primary:hover {
+      background: #333;
+    }
+    input, select {
+      border: 1px solid #bbb;
+      padding: 5px 7px;
+      margin: 3px 4px 3px 0;
+      background: white;
+    }
+    input.small {
+      width: 58px;
     }
     table {
       width: 100%;
@@ -75,6 +97,15 @@
     }
     th {
       background: #eee;
+    }
+    .scroll-table {
+      max-height: 210px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      margin-top: 8px;
+    }
+    .scroll-table table {
+      margin-top: 0;
     }
     .log {
       height: 150px;
@@ -113,11 +144,23 @@
       border-left: 4px solid #333;
       font-size: 14px;
     }
-    .small {
-      font-size: 13px;
-      color: #555;
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      align-items: center;
+      margin: 4px 0;
     }
-    @media (max-width: 900px) {
+    .hint {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.45;
+    }
+    .warning {
+      color: #a43b3b;
+      font-weight: bold;
+    }
+    @media (max-width: 950px) {
       .page { margin: 0; padding: 18px; }
       .layout { grid-template-columns: 1fr; }
     }
@@ -127,32 +170,32 @@
 <div class="page">
   <h1>SPPRC / SPPTW Label-setting Algorithm Visualizer</h1>
   <div class="subtitle">
-    一個用來理解 label、resource extension、feasibility、dominance 的小型互動範例
+    Edit the graph, choose source / target, and observe label extension, feasibility, and dominance step by step.
   </div>
 
   <div class="layout">
     <div>
-      <svg id="graph" viewBox="0 0 700 430"></svg>
+      <svg id="graph" viewBox="0 0 760 460"></svg>
 
       <div class="panel">
-        <h2>操作</h2>
+        <h2>Algorithm Controls</h2>
         <button onclick="nextStep()">Next Step</button>
-        <button onclick="resetAll()">Reset</button>
+        <button onclick="resetAll()">Reset Algorithm</button>
         <button onclick="runAll()">Run All</button>
         <div class="legend">
-          <div><span class="dot" style="background:#4aa3a8"></span>current node / source</div>
-          <div><span class="dot" style="background:#6abf69"></span>target</div>
+          <div><span class="dot" style="background:#4aa3a8"></span>current / source</div>
+          <div><span class="dot" style="background:#6abf69"></span>target / feasible</div>
           <div><span class="dot" style="background:#e58f45"></span>extension under test</div>
           <div><span class="dot" style="background:#c84d4d"></span>infeasible / dominated</div>
         </div>
       </div>
 
       <div class="panel note">
-        <h2>這個範例在看什麼？</h2>
+        <h2>Concept</h2>
         <p>
-          這是一個簡化的 <b>SPPTW</b>，也就是 SPPRC 的特例。
-          每條邊有 <b>(time, cost)</b>，每個節點有 <b>time window [a, b]</b>。
-          演算法會保存多個 labels，因為同一節點可能同時存在「較早但較貴」和「較晚但較便宜」的 partial path。
+          This page visualizes a simplified <b>SPPTW</b>, a special case of <b>SPPRC</b>.
+          Each edge has <b>(time, cost)</b>, and each node has a <b>time window [a, b]</b>.
+          A label stores one partial path and its accumulated resources.
         </p>
         <div class="formula">
           time' = max(a_j, time + edge_time)<br>
@@ -164,8 +207,52 @@
 
     <div>
       <div class="panel">
-        <h2>Step 說明</h2>
-        <div id="explain" class="note">按下 Next Step 開始。</div>
+        <h2>Graph Editor</h2>
+        <div class="row">
+          <label>Source:</label>
+          <select id="sourceSelect"></select>
+          <label>Target:</label>
+          <select id="targetSelect"></select>
+          <button class="primary" onclick="applySettingsAndReset()">Apply & Reset</button>
+        </div>
+
+        <div class="row">
+          <label>Node count:</label>
+          <input id="nodeCountInput" class="small" type="number" min="2" max="10" value="5" />
+          <button onclick="rebuildByNodeCount()">Rebuild Graph</button>
+          <button onclick="addNode()">Add Node</button>
+          <button onclick="removeLastNode()">Remove Last Node</button>
+        </div>
+
+        <div class="row">
+          <button onclick="generateEdges()">Auto-generate Edges</button>
+          <button onclick="resetDefaultGraph()">Default Example</button>
+        </div>
+
+        <p class="hint">
+          Tip: after editing node windows or edge values, press <b>Apply & Reset</b>.
+          The generated graph is directed from left to right, so the label-setting process remains easy to follow.
+        </p>
+
+        <h3>Nodes</h3>
+        <div id="nodeEditor" class="scroll-table"></div>
+
+        <h3>Edges</h3>
+        <div id="edgeEditor" class="scroll-table"></div>
+
+        <div class="row">
+          <label>From</label><select id="newEdgeFrom"></select>
+          <label>To</label><select id="newEdgeTo"></select>
+          <label>Time</label><input id="newEdgeTime" class="small" type="number" min="0" value="3" />
+          <label>Cost</label><input id="newEdgeCost" class="small" type="number" min="0" value="5" />
+          <button onclick="addEdge()">Add Edge</button>
+          <button onclick="removeLastEdge()">Remove Last Edge</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Step Explanation</h2>
+        <div id="explain" class="note">Press Next Step to start.</div>
       </div>
 
       <div class="panel">
@@ -197,29 +284,238 @@
 </div>
 
 <script>
-const nodes = {
-  s: {x: 80,  y: 215, window: [0, 0]},
-  A: {x: 260, y: 90,  window: [2, 8]},
-  B: {x: 260, y: 335, window: [4, 12]},
-  C: {x: 470, y: 215, window: [8, 18]},
-  t: {x: 630, y: 215, window: [0, 30]},
-};
-
-const edges = [
-  {from: "s", to: "A", time: 2, cost: 6},
-  {from: "s", to: "B", time: 4, cost: 2},
-  {from: "A", to: "C", time: 5, cost: 1},
-  {from: "B", to: "C", time: 3, cost: 7},
-  {from: "A", to: "t", time: 9, cost: 8},
-  {from: "C", to: "t", time: 4, cost: 2},
-  {from: "B", to: "t", time: 11, cost: 5},
-];
+let nodes = {};
+let nodeOrder = [];
+let edges = [];
+let sourceNode = "s";
+let targetNode = "t";
 
 let U, P, nextId, currentLabel, outgoingIndex, phase, finished;
 let highlight = {};
 
+function resetDefaultGraph() {
+  nodes = {
+    s: {x: 80,  y: 230, window: [0, 0]},
+    A: {x: 260, y: 105, window: [2, 8]},
+    B: {x: 260, y: 355, window: [4, 12]},
+    C: {x: 500, y: 230, window: [8, 18]},
+    t: {x: 680, y: 230, window: [0, 30]},
+  };
+  nodeOrder = ["s", "A", "B", "C", "t"];
+  edges = [
+    {from: "s", to: "A", time: 2, cost: 6},
+    {from: "s", to: "B", time: 4, cost: 2},
+    {from: "A", to: "C", time: 5, cost: 1},
+    {from: "B", to: "C", time: 3, cost: 7},
+    {from: "A", to: "t", time: 9, cost: 8},
+    {from: "C", to: "t", time: 4, cost: 2},
+    {from: "B", to: "t", time: 11, cost: 5},
+  ];
+  sourceNode = "s";
+  targetNode = "t";
+  refreshEditors();
+  resetAll();
+}
+
+function rebuildByNodeCount() {
+  const count = clamp(parseInt(document.getElementById("nodeCountInput").value, 10) || 5, 2, 10);
+  nodeOrder = [];
+  nodes = {};
+  for (let i = 0; i < count; i++) {
+    const name = i === 0 ? "s" : (i === count - 1 ? "t" : String.fromCharCode(64 + i));
+    nodeOrder.push(name);
+    nodes[name] = {x: 0, y: 0, window: i === 0 ? [0, 0] : [i * 2, i * 2 + 12]};
+  }
+  sourceNode = nodeOrder[0];
+  targetNode = nodeOrder[nodeOrder.length - 1];
+  layoutNodes();
+  generateEdges(false);
+  refreshEditors();
+  resetAll();
+}
+
+function layoutNodes() {
+  const n = nodeOrder.length;
+  nodeOrder.forEach((name, i) => {
+    const x = 80 + (620 * i) / Math.max(1, n - 1);
+    let y = 230;
+    if (i > 0 && i < n - 1) y = i % 2 ? 120 : 340;
+    nodes[name].x = x;
+    nodes[name].y = y;
+  });
+}
+
+function generateEdges(shouldRefresh = true) {
+  applyNodeEditorValues();
+  edges = [];
+  for (let i = 0; i < nodeOrder.length - 1; i++) {
+    const from = nodeOrder[i];
+    const to = nodeOrder[i + 1];
+    edges.push({from, to, time: 2 + (i % 3), cost: 2 + ((i * 3) % 7)});
+    if (i + 2 < nodeOrder.length) {
+      edges.push({from, to: nodeOrder[i + 2], time: 4 + (i % 4), cost: 4 + ((i * 2) % 8)});
+    }
+  }
+  if (shouldRefresh) {
+    refreshEditors();
+    resetAll();
+  }
+}
+
+function addNode() {
+  applySettingsFromEditors();
+  if (nodeOrder.length >= 10) {
+    setExplain("<span class='warning'>Maximum node count is 10.</span>");
+    return;
+  }
+  const newName = nextNodeName();
+  const targetIndex = nodeOrder.indexOf(targetNode);
+  const insertIndex = targetIndex >= 0 ? targetIndex : nodeOrder.length;
+  nodeOrder.splice(insertIndex, 0, newName);
+  nodes[newName] = {x: 0, y: 0, window: [insertIndex * 2, insertIndex * 2 + 12]};
+  layoutNodes();
+  generateEdges(false);
+  refreshEditors();
+  resetAll();
+}
+
+function removeLastNode() {
+  applySettingsFromEditors();
+  if (nodeOrder.length <= 2) {
+    setExplain("<span class='warning'>At least two nodes are required.</span>");
+    return;
+  }
+  const removable = [...nodeOrder].reverse().find(n => n !== sourceNode && n !== targetNode);
+  if (!removable) {
+    setExplain("<span class='warning'>No removable intermediate node.</span>");
+    return;
+  }
+  delete nodes[removable];
+  nodeOrder = nodeOrder.filter(n => n !== removable);
+  edges = edges.filter(e => e.from !== removable && e.to !== removable);
+  layoutNodes();
+  refreshEditors();
+  resetAll();
+}
+
+function nextNodeName() {
+  const candidates = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  return candidates.find(c => !nodes[c]) || `N${nodeOrder.length + 1}`;
+}
+
+function addEdge() {
+  applySettingsFromEditors();
+  const from = document.getElementById("newEdgeFrom").value;
+  const to = document.getElementById("newEdgeTo").value;
+  const time = Math.max(0, parseInt(document.getElementById("newEdgeTime").value, 10) || 0);
+  const cost = Math.max(0, parseInt(document.getElementById("newEdgeCost").value, 10) || 0);
+  if (from === to) {
+    setExplain("<span class='warning'>Self-loop is not used in this teaching demo.</span>");
+    return;
+  }
+  edges.push({from, to, time, cost});
+  refreshEditors();
+  resetAll();
+}
+
+function removeLastEdge() {
+  applySettingsFromEditors();
+  edges.pop();
+  refreshEditors();
+  resetAll();
+}
+
+function applySettingsAndReset() {
+  applySettingsFromEditors();
+  refreshEditors();
+  resetAll();
+}
+
+function applySettingsFromEditors() {
+  applyNodeEditorValues();
+  applyEdgeEditorValues();
+  sourceNode = document.getElementById("sourceSelect").value || sourceNode;
+  targetNode = document.getElementById("targetSelect").value || targetNode;
+  if (sourceNode === targetNode && nodeOrder.length > 1) {
+    targetNode = nodeOrder.find(n => n !== sourceNode) || targetNode;
+  }
+}
+
+function applyNodeEditorValues() {
+  nodeOrder.forEach(name => {
+    const a = parseInt(document.getElementById(`node-${name}-a`)?.value, 10);
+    const b = parseInt(document.getElementById(`node-${name}-b`)?.value, 10);
+    if (!Number.isNaN(a) && !Number.isNaN(b)) {
+      nodes[name].window = [Math.min(a, b), Math.max(a, b)];
+    }
+  });
+}
+
+function applyEdgeEditorValues() {
+  edges.forEach((edge, i) => {
+    const time = parseInt(document.getElementById(`edge-${i}-time`)?.value, 10);
+    const cost = parseInt(document.getElementById(`edge-${i}-cost`)?.value, 10);
+    if (!Number.isNaN(time)) edge.time = Math.max(0, time);
+    if (!Number.isNaN(cost)) edge.cost = Math.max(0, cost);
+  });
+}
+
+function refreshEditors() {
+  document.getElementById("nodeCountInput").value = nodeOrder.length;
+  renderNodeOptions();
+  renderNodeEditor();
+  renderEdgeEditor();
+}
+
+function renderNodeOptions() {
+  const makeOptions = selected => nodeOrder.map(n =>
+    `<option value="${n}" ${n === selected ? "selected" : ""}>${n}</option>`
+  ).join("");
+  document.getElementById("sourceSelect").innerHTML = makeOptions(sourceNode);
+  document.getElementById("targetSelect").innerHTML = makeOptions(targetNode);
+  document.getElementById("newEdgeFrom").innerHTML = makeOptions(sourceNode);
+  document.getElementById("newEdgeTo").innerHTML = makeOptions(targetNode);
+}
+
+function renderNodeEditor() {
+  document.getElementById("nodeEditor").innerHTML = `
+    <table>
+      <thead><tr><th>Node</th><th>Window start a</th><th>Window end b</th></tr></thead>
+      <tbody>
+        ${nodeOrder.map(name => `
+          <tr>
+            <td>${name}</td>
+            <td><input id="node-${name}-a" class="small" type="number" value="${nodes[name].window[0]}"></td>
+            <td><input id="node-${name}-b" class="small" type="number" value="${nodes[name].window[1]}"></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderEdgeEditor() {
+  document.getElementById("edgeEditor").innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>From</th><th>To</th><th>Time</th><th>Cost</th></tr></thead>
+      <tbody>
+        ${edges.map((e, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${e.from}</td>
+            <td>${e.to}</td>
+            <td><input id="edge-${i}-time" class="small" type="number" min="0" value="${e.time}"></td>
+            <td><input id="edge-${i}-cost" class="small" type="number" min="0" value="${e.cost}"></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
 function resetAll() {
-  U = [{id: "L0", node: "s", time: 0, cost: 0, path: ["s"], pred: null}];
+  if (!nodes[sourceNode] || !nodes[targetNode]) return;
+  U = [{id: "L0", node: sourceNode, time: nodes[sourceNode].window[0], cost: 0, path: [sourceNode], pred: null}];
   P = [];
   nextId = 1;
   currentLabel = null;
@@ -227,8 +523,8 @@ function resetAll() {
   phase = "pick";
   finished = false;
   highlight = {};
-  setExplain("初始化：U 只有 source label L0=(node=s, time=0, cost=0)。");
-  setLog("Initialize U = {L0@s}, P = ∅\n");
+  setExplain(`Initialize: U has source label L0 at node ${sourceNode}. Target is ${targetNode}.`);
+  setLog(`Initialize U = {L0@${sourceNode}}, P = ∅\n`);
   render();
 }
 
@@ -287,7 +583,7 @@ function isDominatedByExisting(label) {
 
 function nextStep() {
   if (finished) {
-    setExplain("演算法已結束。按 Reset 可重新開始。");
+    setExplain("Algorithm finished. Press Reset Algorithm to run again.");
     return;
   }
 
@@ -304,9 +600,9 @@ function nextStep() {
     phase = "extend";
     highlight.currentNode = currentLabel.node;
     setExplain(`
-      <b>Pick label：</b>從 U 取出 lexicographic 最小的 label：<br>
+      <b>Pick label:</b> choose the lexicographically smallest label from U.<br>
       <b>${labelText(currentLabel)}</b><br><br>
-      接著會沿著 ${currentLabel.node} 的 outgoing edges 嘗試 extension。
+      Then extend it through the outgoing edges of node ${currentLabel.node}.
     `);
     log(`Pick ${labelText(currentLabel)} from U.`);
     render();
@@ -314,13 +610,23 @@ function nextStep() {
   }
 
   if (phase === "extend") {
+    if (currentLabel.node === targetNode) {
+      P.push(currentLabel);
+      log(`Move ${currentLabel.id} to P because it is already at target ${targetNode}.`);
+      setExplain(`<b>Target reached:</b> ${currentLabel.id} is resident at target node ${targetNode}, so it is moved to P.`);
+      currentLabel = null;
+      phase = "pick";
+      render();
+      return;
+    }
+
     const outs = outgoing(currentLabel.node);
     if (outgoingIndex >= outs.length) {
       P.push(currentLabel);
       log(`Move ${currentLabel.id} to P.`);
       setExplain(`
-        <b>Finish current label：</b>${currentLabel.id} 的所有 outgoing edges 都處理完。<br>
-        將 ${currentLabel.id} 放入 processed set P。
+        <b>Finish current label:</b> all outgoing edges of ${currentLabel.id} have been processed.<br>
+        Move ${currentLabel.id} into processed set P.
       `);
       currentLabel = null;
       phase = "pick";
@@ -359,8 +665,8 @@ function nextStep() {
         <b>Extend through edge ${e.from} → ${e.to}</b><br>
         Edge resource = (${e.time}, ${e.cost})<br>
         ${formula}<br><br>
-        <b style="color:#c84d4d">Infeasible：</b>
-        time'=${newTime} 超過 node ${e.to} 的 upper time window ${target.window[1]}，所以丟掉。
+        <b style="color:#c84d4d">Infeasible:</b>
+        time'=${newTime} exceeds node ${e.to}'s upper time window ${target.window[1]}, so this label is discarded.
       `);
       render();
       return;
@@ -373,9 +679,9 @@ function nextStep() {
       setExplain(`
         <b>Extend through edge ${e.from} → ${e.to}</b><br>
         ${formula}<br><br>
-        產生 ${labelText(newLabel)}，但它被
-        <b>${labelText(dominator)}</b> dominate。<br>
-        <b style="color:#c84d4d">Dominated label 直接刪除。</b>
+        The new label ${labelText(newLabel)} is dominated by
+        <b>${labelText(dominator)}</b>.<br>
+        <b style="color:#c84d4d">Dominated label is discarded.</b>
       `);
       render();
       return;
@@ -393,9 +699,9 @@ function nextStep() {
       <b>Extend through edge ${e.from} → ${e.to}</b><br>
       Edge resource = (${e.time}, ${e.cost})<br>
       ${formula}<br><br>
-      <b style="color:#2e8b57">Feasible：</b>
-      ${labelText(newLabel)} 加入 U。<br>
-      ${removed.length ? `同時移除被它 dominate 的 label：${removed.map(x => x.id).join(", ")}` : `沒有 label 被它 dominate。`}
+      <b style="color:#2e8b57">Feasible:</b>
+      ${labelText(newLabel)} is added to U.<br>
+      ${removed.length ? `It also removes dominated label(s): ${removed.map(x => x.id).join(", ")}` : `No existing label is dominated by it.`}
     `);
     render();
   }
@@ -403,17 +709,17 @@ function nextStep() {
 
 function finishAlgorithm() {
   finished = true;
-  const targetLabels = P.filter(l => l.node === "t");
+  const targetLabels = P.filter(l => l.node === targetNode);
   if (targetLabels.length === 0) {
-    setExplain("<b>Finish：</b>U 已空，但沒有找到可行的 target label。");
+    setExplain(`<b>Finish:</b> U is empty, but no feasible label reached target ${targetNode}.`);
     log("Finish: no feasible path to target.");
   } else {
     targetLabels.sort((a, b) => (a.cost - b.cost) || (a.time - b.time));
     const best = targetLabels[0];
     highlight.bestPath = best.path;
     setExplain(`
-      <b>Finish：</b>U 已空。<br>
-      在 P 中所有 resident at target t 的 labels 裡，選 cost 最小者：<br>
+      <b>Finish:</b> U is empty.<br>
+      Among labels resident at target ${targetNode}, choose the minimum-cost feasible label:<br>
       <b>${labelText(best)}</b><br>
       Path = <b>${best.path.join(" → ")}</b>
     `);
@@ -424,7 +730,7 @@ function finishAlgorithm() {
 
 function runAll() {
   let guard = 0;
-  while (!finished && guard < 200) {
+  while (!finished && guard < 500) {
     nextStep();
     guard++;
   }
@@ -476,6 +782,7 @@ function renderGraph() {
   }
 
   edges.forEach(e => {
+    if (!nodes[e.from] || !nodes[e.to]) return;
     const a = nodes[e.from], b = nodes[e.to];
     const key = e.from + "->" + e.to;
     let color = "#333", width = 2.2, marker = "url(#arrow)";
@@ -503,11 +810,12 @@ function renderGraph() {
     addSvgText(svg, mx, my - 8, `(${e.time},${e.cost})`, 14, "#111", "middle");
   });
 
-  Object.entries(nodes).forEach(([name, n]) => {
+  nodeOrder.forEach(name => {
+    const n = nodes[name];
     let fill = "#9ed0ef";
     let stroke = "#146aa1";
-    if (name === "s") fill = "#4aa3a8";
-    if (name === "t") fill = "#6abf69";
+    if (name === sourceNode) fill = "#4aa3a8";
+    if (name === targetNode) fill = "#6abf69";
     if (highlight.currentNode === name) {
       fill = "#4aa3a8";
       stroke = "#064f53";
@@ -550,7 +858,11 @@ function addSvgText(svg, x, y, text, size, fill, anchor="start", weight="normal"
   svg.appendChild(t);
 }
 
-resetAll();
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+resetDefaultGraph();
 </script>
 </body>
 </html>
